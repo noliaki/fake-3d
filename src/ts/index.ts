@@ -10,7 +10,7 @@ async function init(): Promise<void> {
     canvas: document.getElementById('canvas') as HTMLCanvasElement,
     vertexShaderSource,
     fragmentShaderSource,
-    imgSrc: '/img/cat.jpg',
+    imgSrc: './img/cat.jpg',
     blur: 30
   })
 
@@ -21,8 +21,8 @@ async function init(): Promise<void> {
 init()
 
 function render() {
-  fake3D.dx = Math.sin(new Date().getTime() / 1000) * 0.5
-  // fake3D.dy = Math.sin(new Date().getTime() / 1000)
+  fake3D.dx = Math.cos(new Date().getTime() / 800) * 0.1
+  fake3D.dy = Math.sin(new Date().getTime() / 600) * 0.7
 
   fake3D.render()
   requestAnimationFrame(render)

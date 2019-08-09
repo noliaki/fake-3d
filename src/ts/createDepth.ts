@@ -4,7 +4,7 @@ const min: number = 0
 const max: number = 255
 
 export async function createDepth(
-  imgSrc: string = '/img/cat.jpg',
+  imgSrc: string = './img/cat.jpg',
   blur: number = 10
 ): Promise<HTMLCanvasElement> {
   const canvas: HTMLCanvasElement = document.createElement('canvas')

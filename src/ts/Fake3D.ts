@@ -31,6 +31,7 @@ export default class Fake3D {
   private blur: number
 
   private texture: WebGLTexture
+  private imageAspect: number
 
   constructor({
     canvas,
@@ -51,7 +52,6 @@ export default class Fake3D {
     this.glContext = this.canvas.getContext('webgl')
     this.winWidth = window.innerWidth
     this.winHeight = window.innerHeight
-    this.ratio = window.devicePixelRatio
 
     this.canvas.width = this.winWidth
     this.canvas.height = this.winHeight
@@ -114,6 +114,7 @@ export default class Fake3D {
 
   public async bindTexture(): Promise<void> {
     this.texture = await this.createTexture()
+    console.log(this.texture)
     const depthTexture: WebGLTexture = await this.createTexture(true)
 
     const u_image0Location = this.glContext.getUniformLocation(
@@ -133,6 +134,8 @@ export default class Fake3D {
     this.glContext.bindTexture(this.glContext.TEXTURE_2D, this.texture)
     this.glContext.activeTexture(this.glContext.TEXTURE1)
     this.glContext.bindTexture(this.glContext.TEXTURE_2D, depthTexture)
+
+    this.setup()
   }
 
   public render(): void {
@@ -165,8 +168,11 @@ export default class Fake3D {
       ? await createDepth(this.imgSrc, this.blur)
       : await loadImg(this.imgSrc)
 
+    if (image instanceof Image) {
+      this.imageAspect = image.naturalHeight / image.naturalWidth
+    }
     image.style.width = '300px'
-    document.body.appendChild(image)
+    document.querySelector('.wrapper').appendChild(image)
 
     const texture: WebGLTexture = this.glContext.createTexture()
     this.glContext.bindTexture(this.glContext.TEXTURE_2D, texture)
@@ -202,5 +208,40 @@ export default class Fake3D {
     )
 
     return texture
+  }
+
+  public setup(): void {
+    this.winWidth = window.innerWidth
+    this.winHeight = window.innerHeight
+    this.ratio = window.devicePixelRatio
+
+    this.canvas.width = this.winWidth * this.ratio
+    this.canvas.height = this.winHeight * this.ratio
+    this.canvas.style.width = `${this.winWidth}px`
+    this.canvas.style.height = `${this.winHeight}px`
+
+    if (this.winHeight / this.winWidth < this.imageAspect) {
+      this.uResolution.set(
+        this.winWidth,
+        this.winHeight,
+        1,
+        this.winHeight / this.winWidth / this.imageAspect
+      )
+    } else {
+      this.uResolution.set(
+        this.winWidth,
+        this.winHeight,
+        (this.winWidth / this.winHeight) * this.imageAspect,
+        1
+      )
+    }
+    this.uRatio.set(1 / this.ratio)
+
+    this.glContext.viewport(
+      0,
+      0,
+      this.winWidth * this.ratio,
+      this.winHeight * this.ratio
+    )
   }
 }
