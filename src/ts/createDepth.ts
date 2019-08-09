@@ -1,15 +1,18 @@
 import { loadImg } from './utils'
 
+const min: number = 0
+const max: number = 255
+
 export async function createDepth(
   imgSrc: string = '/img/cat.jpg',
-  blur: number
+  blur: number = 10
 ): Promise<HTMLCanvasElement> {
   const canvas: HTMLCanvasElement = document.createElement('canvas')
   const context: CanvasRenderingContext2D = canvas.getContext('2d')
   const image: HTMLImageElement = await loadImg(imgSrc)
 
-  canvas.width = image.naturalWidth / 4
-  canvas.height = image.naturalHeight / 4
+  canvas.width = image.naturalWidth
+  canvas.height = image.naturalHeight
   context.filter = `blur(${blur}px)`
   context.drawImage(image, 0, 0, canvas.width, canvas.height)
   const imageData: ImageData = context.getImageData(
@@ -27,9 +30,9 @@ export async function createDepth(
 
     const avg: number = a ? Math.floor((r + g + b) / 3) : 0
 
-    rgbaArr[i + 0] = avg * 1.3
-    rgbaArr[i + 1] = avg * 1.3
-    rgbaArr[i + 2] = avg * 1.3
+    rgbaArr[i + 0] = avg
+    rgbaArr[i + 1] = avg
+    rgbaArr[i + 2] = avg
   }
 
   context.putImageData(imageData, 0, 0)

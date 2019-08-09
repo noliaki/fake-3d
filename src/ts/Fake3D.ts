@@ -2,7 +2,7 @@ import Uniform from './Uniform'
 import { loadImg } from './utils'
 import { createDepth } from './createDepth'
 
-export default class App {
+export default class Fake3D {
   private canvas: HTMLCanvasElement
   private context: WebGLRenderingContext
   private container: HTMLCanvasElement
@@ -10,8 +10,8 @@ export default class App {
   private ratio: number
   private winWidth: number
   private winHeight: number
-  private vTh: number
-  private hTh: number
+  private vTh: number = 35
+  private hTh: number = 10
   private program: WebGLProgram
   private glContext: WebGLRenderingContext
 
@@ -23,13 +23,38 @@ export default class App {
 
   private positionLocation: number
 
-  constructor(vertexShaderSource: string, fragmentShaderSource: string) {
-    this.canvas = document.createElement('canvas')
+  private imgSrc: string
+
+  public dx: number = 0
+  public dy: number = 0
+
+  private blur: number
+
+  private texture: WebGLTexture
+
+  constructor({
+    canvas,
+    vertexShaderSource,
+    fragmentShaderSource,
+    imgSrc,
+    blur = 10
+  }: {
+    canvas: HTMLCanvasElement
+    vertexShaderSource: string
+    fragmentShaderSource: string
+    imgSrc: string
+    blur?: number
+  }) {
+    this.blur = blur
+    this.imgSrc = imgSrc
+    this.canvas = canvas
     this.glContext = this.canvas.getContext('webgl')
     this.winWidth = window.innerWidth
     this.winHeight = window.innerHeight
     this.ratio = window.devicePixelRatio
-    this.startTime = new Date().getTime()
+
+    this.canvas.width = this.winWidth
+    this.canvas.height = this.winHeight
 
     this.program = this.glContext.createProgram()
     this.addShader(vertexShaderSource, this.glContext.VERTEX_SHADER)
@@ -75,11 +100,21 @@ export default class App {
       0,
       0
     )
+
+    this.uResolution.set(this.canvas.width, this.canvas.height, 1, 1)
+    this.uRatio.set(1 / this.ratio)
+    this.uThreshold.set(this.hTh, this.vTh)
+    this.glContext.viewport(
+      0,
+      0,
+      this.canvas.width * this.ratio,
+      this.canvas.height * this.ratio
+    )
   }
 
-  public async createFake3D(imgSrc: string): Promise<void> {
-    const texture: WebGLTexture = await this.createTexture(imgSrc)
-    const depthTexture: WebGLTexture = await this.createTexture(imgSrc, true)
+  public async bindTexture(): Promise<void> {
+    this.texture = await this.createTexture()
+    const depthTexture: WebGLTexture = await this.createTexture(true)
 
     const u_image0Location = this.glContext.getUniformLocation(
       this.program,
@@ -95,9 +130,20 @@ export default class App {
     this.glContext.uniform1i(u_image1Location, 1) // texture unit 1
 
     this.glContext.activeTexture(this.glContext.TEXTURE0)
-    this.glContext.bindTexture(this.glContext.TEXTURE_2D, texture)
+    this.glContext.bindTexture(this.glContext.TEXTURE_2D, this.texture)
     this.glContext.activeTexture(this.glContext.TEXTURE1)
     this.glContext.bindTexture(this.glContext.TEXTURE_2D, depthTexture)
+  }
+
+  public render(): void {
+    if (!this.startTime) {
+      this.startTime = new Date().getTime()
+    }
+
+    const currentTime: number = (new Date().getTime() - this.startTime) / 1000
+    this.uTime.set(currentTime)
+    this.uMouse.set(this.dx, this.dy)
+    this.glContext.drawArrays(this.glContext.TRIANGLE_STRIP, 0, 4)
   }
 
   private addShader(source: string, type: number): void {
@@ -114,13 +160,14 @@ export default class App {
     this.glContext.attachShader(this.program, shader)
   }
 
-  private async createTexture(
-    imgSrc: string,
-    depth: boolean = false
-  ): Promise<WebGLTexture> {
+  private async createTexture(depth: boolean = false): Promise<WebGLTexture> {
     const image: HTMLImageElement | HTMLCanvasElement = depth
-      ? await createDepth(imgSrc, 10)
-      : await loadImg(imgSrc)
+      ? await createDepth(this.imgSrc, this.blur)
+      : await loadImg(this.imgSrc)
+
+    image.style.width = '300px'
+    document.body.appendChild(image)
+
     const texture: WebGLTexture = this.glContext.createTexture()
     this.glContext.bindTexture(this.glContext.TEXTURE_2D, texture)
     this.glContext.texParameteri(
