@@ -1,7 +1,8 @@
 import Fake3D from './Fake3D'
 import vertexShaderSource from '../shader/vertex.glsl'
 import fragmentShaderSource from '../shader/fragment.glsl'
-import { createDepth } from './createDepth'
+import { loadImg } from './utils'
+import * as faceapi from 'face-api.js'
 
 let fake3D: Fake3D
 
@@ -13,6 +14,17 @@ async function init(): Promise<void> {
     imgSrc: './img/cat.jpg',
     blur: 30
   })
+
+  await faceapi.nets.ssdMobilenetv1.load(
+    'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json'
+  )
+  const minConfidence = 0.5
+  const girl = await loadImg('/img/girl.jpg')
+  const result = await faceapi.detectSingleFace(
+    girl,
+    new faceapi.SsdMobilenetv1Options({ minConfidence })
+  )
+  console.log(result)
 
   await fake3D.bindTexture()
   render()
