@@ -5,59 +5,69 @@ export default class DepthMap {
     this.canvas = document.createElement('canvas')
     this.context = this.canvas.getContext('2d')
 
-    this.canvas.width = result.imageWidth
-    this.canvas.height = result.imageHeight
+    this.canvas.width = result.detection.imageWidth
+    this.canvas.height = result.detection.imageHeight
 
     this.ratio = window.devicePixelRatio
 
     // this.context.scale(this.ratio, this.ratio)
 
-    // this.context.clearRect(0, 0, result.imageWidth, result.imageHeight)
-    // this.context.fillStyle = '#000'
-    // this.context.fillRect(0, 0, result.imageWidth, result.imageHeight)
-
-    this.context.drawImage(
-      originalImage,
+    this.context.clearRect(
       0,
       0,
-      result.imageWidth,
-      result.imageHeight
+      result.detection.imageWidth,
+      result.detection.imageHeight
+    )
+    this.context.fillStyle = '#000'
+    this.context.fillRect(
+      0,
+      0,
+      result.detection.imageWidth,
+      result.detection.imageHeight
     )
 
-    // this.faceParts = [
-    //   result.getJawOutline(),
-    //   result.getNose(),
-    //   result.getMouth(),
-    //   result.getLeftEye(),
-    //   result.getRightEye(),
-    //   result.getLeftEyeBrow(),
-    //   result.getRightEyeBrow()
-    // ]
+    // this.context.drawImage(
+    //   originalImage,
+    //   0,
+    //   0,
+    //   result.detection.imageWidth,
+    //   result.detection.imageHeight
+    // )
 
-    // console.log(this.faceParts)
+    this.faceParts = [
+      result.landmarks.getJawOutline(),
+      result.landmarks.getNose(),
+      result.landmarks.getMouth(),
+      result.landmarks.getLeftEye(),
+      result.landmarks.getRightEye(),
+      result.landmarks.getLeftEyeBrow(),
+      result.landmarks.getRightEyeBrow()
+    ]
 
-    // this.colors = ['#999', '#ccc', '#eee']
+    console.log(this.faceParts)
 
-    // // this.context.filter = `blur(${10}px)`
-    // this.faceParts.forEach((points, index) => {
-    //   this.context.beginPath()
-    //   this.context.fillStyle = this.colors[index] || '#fff'
-    //   this.context.strokeStyle = this.colors[index] || '#fff'
-    //   this.context.lineWidth = 30
-    //   this.context.lineCap = 'round'
-    //   this.context.lineJoin = 'round'
+    this.colors = ['#999', '#ccc', '#eee']
 
-    //   points.forEach((point, index) => {
-    //     if (index === 0) {
-    //       this.context.moveTo(point.x, point.y)
-    //     } else {
-    //       this.context.lineTo(point.x, point.y)
-    //     }
-    //   })
+    this.context.filter = `blur(${5}px)`
+    this.faceParts.forEach((points, index) => {
+      this.context.beginPath()
+      this.context.fillStyle = this.colors[index] || '#fff'
+      this.context.strokeStyle = this.colors[index] || '#fff'
+      this.context.lineWidth = result.detection.imageWidth / 100
+      this.context.lineCap = 'round'
+      this.context.lineJoin = 'round'
 
-    //   this.context.stroke()
-    //   this.context.fill()
-    // })
+      points.forEach((point, index) => {
+        if (index === 0) {
+          this.context.moveTo(point.x, point.y)
+        } else {
+          this.context.lineTo(point.x, point.y)
+        }
+      })
+
+      this.context.stroke()
+      this.context.fill()
+    })
 
     return this.canvas
   }
