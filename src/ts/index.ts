@@ -3,7 +3,7 @@ import * as bodyPix from '@tensorflow-models/body-pix'
 import Fake3D from './Fake3D'
 
 const rainbow: [number, number, number][] = [
-  [110, 64, 170],
+  [255, 64, 170],
   [143, 61, 178],
   [178, 60, 178],
   [210, 62, 167],
@@ -32,31 +32,31 @@ const rainbow: [number, number, number][] = [
 let fake3D: Fake3D
 
 async function init(): Promise<void> {
-  const image: HTMLImageElement = await loadImg('/img/girl.jpg')
-  const net: bodyPix.BodyPix = await bodyPix.load()
-  const segmentation = await net.estimatePersonSegmentation(image)
-  const partSegmentation = await net.estimatePartSegmentation(image)
-  const coloredPartData: ImageData = bodyPix.toColoredPartImageData(
-    partSegmentation,
-    rainbow
-  )
-  const maskData: ImageData = bodyPix.toMaskImageData(segmentation, true)
-  const canvas: HTMLCanvasElement = document.createElement('canvas')
-  const context: CanvasRenderingContext2D = canvas.getContext('2d')
-  // canvas.style.backgroundColor = '#000'
-  canvas.width = maskData.width
-  canvas.height = maskData.height
+  const originalImage: HTMLImageElement = await loadImg('/img/girl.jpg')
+  // const net: bodyPix.BodyPix = await bodyPix.load()
+  // const segmentation = await net.estimatePersonSegmentation(image)
+  // const partSegmentation = await net.estimatePartSegmentation(image)
+  // const coloredPartData: ImageData = bodyPix.toColoredPartImageData(
+  //   partSegmentation,
+  //   rainbow
+  // )
+  // const maskData: ImageData = bodyPix.toMaskImageData(segmentation, false)
+  // const canvas: HTMLCanvasElement = document.createElement('canvas')
+  // const context: CanvasRenderingContext2D = canvas.getContext('2d')
+  // // canvas.style.backgroundColor = '#000'
+  // canvas.width = maskData.width
+  // canvas.height = maskData.height
 
-  context.fillStyle = '#fff'
-  context.fillRect(0, 0, maskData.width, maskData.height)
-  context.putImageData(maskData, 0, 0)
+  // context.fillStyle = '#fff'
+  // context.fillRect(0, 0, maskData.width, maskData.height)
+  // context.putImageData(maskData, 0, 0)
 
-  document.querySelector('.wrapper').appendChild(canvas)
+  // document.querySelector('.wrapper').appendChild(canvas)
 
-  const opacity: number = 1
-  const maskBlurAmount: number = 30
-  const flipHorizontal: boolean = false
-  const poxelCellWidth: number = 4
+  // const opacity: number = 1
+  // const maskBlurAmount: number = 30
+  // const flipHorizontal: boolean = false
+  // const poxelCellWidth: number = 4
 
   // bodyPix.drawMask(
   //   canvas,
@@ -67,11 +67,17 @@ async function init(): Promise<void> {
   //   flipHorizontal
   // )
 
+  const depthImage: HTMLCanvasElement | HTMLImageElement = await createDepthMap(
+    originalImage
+  )
+
   fake3D = new Fake3D({
-    originalImage: image,
-    depthImage: canvas
+    originalImage,
+    depthImage
   })
+
   document.querySelector('.wrapper').appendChild(fake3D.canvas)
+  document.querySelector('.wrapper').appendChild(depthImage)
 
   // bodyPix.drawPixelatedMask(
   //   canvas,
@@ -82,13 +88,67 @@ async function init(): Promise<void> {
   //   flipHorizontal,
   //   poxelCellWidth
   // )
-  console.log(partSegmentation)
+  // console.log(partSegmentation)
   render()
 }
 
+async function createDepthMap(
+  imageSource: HTMLImageElement | HTMLCanvasElement
+): Promise<HTMLCanvasElement> {
+  const net: bodyPix.BodyPix = await bodyPix.load()
+  const canvas: HTMLCanvasElement = document.createElement('canvas')
+  const context: CanvasRenderingContext2D = canvas.getContext('2d')
+  const partSegmentation = await net.estimatePartSegmentation(imageSource)
+  const coloredPartData: ImageData = bodyPix.toColoredPartImageData(
+    partSegmentation,
+    rainbow
+  )
+  const opacity: number = 1
+  const maskBlurAmount: number = 40
+  const flipHorizontal: boolean = false
+  const poxelCellWidth: number = 2
+
+  bodyPix.drawMask(
+    canvas,
+    imageSource,
+    coloredPartData,
+    opacity,
+    maskBlurAmount,
+    flipHorizontal
+  )
+
+  const imageData: ImageData = context.getImageData(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  )
+
+  const data: Uint8ClampedArray = imageData.data
+
+  for (let i: number = 0, len: number = data.length; i < len; i += 4) {
+    const r: number = data[i + 0]
+    const g: number = data[i + 1]
+    const b: number = data[i + 2]
+    const a: number = data[i + 3]
+
+    const avg: number = 300 - (r + g + b) / 3
+
+    data[i + 0] = avg
+    data[i + 1] = avg
+    data[i + 2] = avg
+  }
+
+  context.fillStyle = '#aaa'
+  context.fillRect(0, 0, canvas.width, canvas.height)
+  context.putImageData(imageData, 0, 0)
+
+  return canvas
+}
+
 function render() {
-  fake3D.dx = Math.cos(new Date().getTime() / 800) * 0.1
-  fake3D.dy = Math.sin(new Date().getTime() / 600) * 0.7
+  fake3D.dx = Math.cos(new Date().getTime() / 800)
+  fake3D.dy = Math.sin(new Date().getTime() / 600)
 
   fake3D.render()
   requestAnimationFrame(render)
