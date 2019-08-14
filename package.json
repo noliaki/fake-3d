@@ -18,6 +18,8 @@
     "typescript": "^3.5.3"
   },
   "dependencies": {
+    "@tensorflow-models/body-pix": "^1.1.2",
+    "@tensorflow/tfjs-converter": "^1.2.7",
     "face-api.js": "^0.20.1"
   }
 }
