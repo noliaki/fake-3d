@@ -1,19 +1,51 @@
-import Uniform from './Uniform'
-import { loadImg } from './utils'
-import { createDepth } from './createDepth'
+const fragmentShaderSource: string = `#ifdef GL_ES
+precision mediump float;
+#endif
+
+uniform vec4 resolution;
+uniform vec2 mouse;
+uniform vec2 threshold;
+uniform float time;
+uniform float pixelRatio;
+uniform sampler2D image0;
+uniform sampler2D image1;
+
+vec2 mirrored(vec2 v) {
+vec2 m = mod(v,2.);
+return mix(m,2.0 - m, step(1.0 ,m));
+}
+
+void main() {
+// uvs and textures
+vec2 uv = pixelRatio*gl_FragCoord.xy / resolution.xy ;
+vec2 vUv = (uv - vec2(0.5))*resolution.zw + vec2(0.5);
+vUv.y = 1. - vUv.y;
+vec4 tex1 = texture2D(image1,mirrored(vUv));
+vec2 fake3d = vec2(vUv.x + (tex1.r - 0.5)*mouse.x/threshold.x, vUv.y + (tex1.r - 0.5)*mouse.y/threshold.y);
+gl_FragColor = texture2D(image0,mirrored(fake3d));
+}
+`
+
+const vertexShaderSource: string = `attribute vec2 a_position;
+
+void main() {
+  gl_Position = vec4( a_position, 0, 1 );
+}
+`
 
 export default class Fake3D {
-  private canvas: HTMLCanvasElement
-  private context: WebGLRenderingContext
-  private container: HTMLCanvasElement
+  public canvas: HTMLCanvasElement
   private startTime: number
   private ratio: number
-  private winWidth: number
-  private winHeight: number
+  private width: number
+  private height: number
   private vTh: number = 35
   private hTh: number = 10
   private program: WebGLProgram
   private glContext: WebGLRenderingContext
+
+  private originalImage: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement
+  private depthImage: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement
 
   private uResolution: Uniform
   private uMouse: Uniform
@@ -22,39 +54,32 @@ export default class Fake3D {
   private uThreshold: Uniform
 
   private positionLocation: number
-
-  private imgSrc: string
+  private imageAspect: number
 
   public dx: number = 0
   public dy: number = 0
 
-  private blur: number
-
-  private texture: WebGLTexture
-  private imageAspect: number
-
   constructor({
     canvas,
-    vertexShaderSource,
-    fragmentShaderSource,
-    imgSrc,
-    blur = 10
+    originalImage,
+    depthImage
   }: {
-    canvas: HTMLCanvasElement
-    vertexShaderSource: string
-    fragmentShaderSource: string
-    imgSrc: string
-    blur?: number
+    canvas?: HTMLCanvasElement
+    originalImage: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement
+    depthImage: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement
   }) {
-    this.blur = blur
-    this.imgSrc = imgSrc
-    this.canvas = canvas
+    this.canvas = canvas || document.createElement('canvas')
     this.glContext = this.canvas.getContext('webgl')
-    this.winWidth = window.innerWidth
-    this.winHeight = window.innerHeight
+    this.width = window.innerWidth
+    this.height = window.innerHeight
 
-    this.canvas.width = this.winWidth
-    this.canvas.height = this.winHeight
+    this.originalImage = originalImage
+    this.depthImage = depthImage
+
+    this.canvas.width = this.width
+    this.canvas.height = this.height
+
+    this.ratio = window.devicePixelRatio
 
     this.program = this.glContext.createProgram()
     this.addShader(vertexShaderSource, this.glContext.VERTEX_SHADER)
@@ -110,12 +135,6 @@ export default class Fake3D {
       this.canvas.width * this.ratio,
       this.canvas.height * this.ratio
     )
-  }
-
-  public async bindTexture(): Promise<void> {
-    this.texture = await this.createTexture()
-    console.log(this.texture)
-    const depthTexture: WebGLTexture = await this.createTexture(true)
 
     const u_image0Location = this.glContext.getUniformLocation(
       this.program,
@@ -130,10 +149,18 @@ export default class Fake3D {
     this.glContext.uniform1i(u_image0Location, 0) // texture unit 0
     this.glContext.uniform1i(u_image1Location, 1) // texture unit 1
 
+    this.imageAspect = this.originalImage.height / this.originalImage.width
+
     this.glContext.activeTexture(this.glContext.TEXTURE0)
-    this.glContext.bindTexture(this.glContext.TEXTURE_2D, this.texture)
+    this.glContext.bindTexture(
+      this.glContext.TEXTURE_2D,
+      this.createTexture(this.originalImage)
+    )
     this.glContext.activeTexture(this.glContext.TEXTURE1)
-    this.glContext.bindTexture(this.glContext.TEXTURE_2D, depthTexture)
+    this.glContext.bindTexture(
+      this.glContext.TEXTURE_2D,
+      this.createTexture(this.depthImage)
+    )
 
     this.setup()
   }
@@ -163,18 +190,11 @@ export default class Fake3D {
     this.glContext.attachShader(this.program, shader)
   }
 
-  private async createTexture(depth: boolean = false): Promise<WebGLTexture> {
-    const image: HTMLImageElement | HTMLCanvasElement = depth
-      ? await createDepth(this.imgSrc, this.blur)
-      : await loadImg(this.imgSrc)
-
-    if (image instanceof Image) {
-      this.imageAspect = image.naturalHeight / image.naturalWidth
-    }
-    image.style.width = '300px'
-    document.querySelector('.wrapper').appendChild(image)
-
+  private createTexture(
+    imageSource: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement
+  ): WebGLTexture {
     const texture: WebGLTexture = this.glContext.createTexture()
+
     this.glContext.bindTexture(this.glContext.TEXTURE_2D, texture)
     this.glContext.texParameteri(
       this.glContext.TEXTURE_2D,
@@ -204,34 +224,36 @@ export default class Fake3D {
       this.glContext.RGBA,
       this.glContext.RGBA,
       this.glContext.UNSIGNED_BYTE,
-      image
+      imageSource
     )
 
     return texture
   }
 
-  public setup(): void {
-    this.winWidth = window.innerWidth
-    this.winHeight = window.innerHeight
-    this.ratio = window.devicePixelRatio
+  public setup({
+    _width = window.innerWidth,
+    _height = window.innerHeight
+  } = {}): void {
+    this.width = _width
+    this.height = _height
 
-    this.canvas.width = this.winWidth * this.ratio
-    this.canvas.height = this.winHeight * this.ratio
-    this.canvas.style.width = `${this.winWidth}px`
-    this.canvas.style.height = `${this.winHeight}px`
+    this.canvas.width = this.width * this.ratio
+    this.canvas.height = this.height * this.ratio
+    this.canvas.style.width = `${this.width}px`
+    this.canvas.style.height = `${this.height}px`
 
-    if (this.winHeight / this.winWidth < this.imageAspect) {
+    if (this.height / this.width < this.imageAspect) {
       this.uResolution.set(
-        this.winWidth,
-        this.winHeight,
+        this.width,
+        this.height,
         1,
-        this.winHeight / this.winWidth / this.imageAspect
+        this.height / this.width / this.imageAspect
       )
     } else {
       this.uResolution.set(
-        this.winWidth,
-        this.winHeight,
-        (this.winWidth / this.winHeight) * this.imageAspect,
+        this.width,
+        this.height,
+        (this.width / this.height) * this.imageAspect,
         1
       )
     }
@@ -240,8 +262,35 @@ export default class Fake3D {
     this.glContext.viewport(
       0,
       0,
-      this.winWidth * this.ratio,
-      this.winHeight * this.ratio
+      this.width * this.ratio,
+      this.height * this.ratio
     )
+  }
+}
+
+class Uniform {
+  name: string
+  suffix: string
+  program: WebGLProgram
+  gl: WebGLRenderingContext
+  location: WebGLUniformLocation
+
+  constructor(
+    name: string,
+    suffix: string,
+    program: WebGLProgram,
+    gl: WebGLRenderingContext
+  ) {
+    this.name = name
+    this.suffix = suffix
+    this.program = program
+    this.gl = gl
+    this.location = gl.getUniformLocation(program, name)
+  }
+
+  set(...values: any[]): void {
+    const method: string = `uniform${this.suffix}`
+    const args: any[] = [this.location].concat(values)
+    this.gl[method].apply(this.gl, args)
   }
 }
