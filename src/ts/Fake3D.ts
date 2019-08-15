@@ -1,20 +1,51 @@
-import Uniform from './Uniform'
-import vertexShaderSource from '../shader/vertex.glsl'
-import fragmentShaderSource from '../shader/fragment.glsl'
+const fragmentShaderSource: string = `#ifdef GL_ES
+precision mediump float;
+#endif
+
+uniform vec4 resolution;
+uniform vec2 mouse;
+uniform vec2 threshold;
+uniform float time;
+uniform float pixelRatio;
+uniform sampler2D image0;
+uniform sampler2D image1;
+
+vec2 mirrored(vec2 v) {
+vec2 m = mod(v,2.);
+return mix(m,2.0 - m, step(1.0 ,m));
+}
+
+void main() {
+// uvs and textures
+vec2 uv = pixelRatio*gl_FragCoord.xy / resolution.xy ;
+vec2 vUv = (uv - vec2(0.5))*resolution.zw + vec2(0.5);
+vUv.y = 1. - vUv.y;
+vec4 tex1 = texture2D(image1,mirrored(vUv));
+vec2 fake3d = vec2(vUv.x + (tex1.r - 0.5)*mouse.x/threshold.x, vUv.y + (tex1.r - 0.5)*mouse.y/threshold.y);
+gl_FragColor = texture2D(image0,mirrored(fake3d));
+}
+`
+
+const vertexShaderSource: string = `attribute vec2 a_position;
+
+void main() {
+  gl_Position = vec4( a_position, 0, 1 );
+}
+`
 
 export default class Fake3D {
   public canvas: HTMLCanvasElement
   private startTime: number
   private ratio: number
-  private winWidth: number
-  private winHeight: number
+  private width: number
+  private height: number
   private vTh: number = 35
   private hTh: number = 10
   private program: WebGLProgram
   private glContext: WebGLRenderingContext
 
-  private originalImage: HTMLImageElement | HTMLCanvasElement
-  private depthImage: HTMLImageElement | HTMLCanvasElement
+  private originalImage: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement
+  private depthImage: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement
 
   private uResolution: Uniform
   private uMouse: Uniform
@@ -34,19 +65,19 @@ export default class Fake3D {
     depthImage
   }: {
     canvas?: HTMLCanvasElement
-    originalImage: HTMLImageElement | HTMLCanvasElement
-    depthImage: HTMLImageElement | HTMLCanvasElement
+    originalImage: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement
+    depthImage: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement
   }) {
     this.canvas = canvas || document.createElement('canvas')
     this.glContext = this.canvas.getContext('webgl')
-    this.winWidth = window.innerWidth
-    this.winHeight = window.innerHeight
+    this.width = window.innerWidth
+    this.height = window.innerHeight
 
     this.originalImage = originalImage
     this.depthImage = depthImage
 
-    this.canvas.width = this.winWidth
-    this.canvas.height = this.winHeight
+    this.canvas.width = this.width
+    this.canvas.height = this.height
 
     this.ratio = window.devicePixelRatio
 
@@ -160,7 +191,7 @@ export default class Fake3D {
   }
 
   private createTexture(
-    imageSource: HTMLImageElement | HTMLCanvasElement
+    imageSource: HTMLImageElement | HTMLCanvasElement | HTMLVideoElement
   ): WebGLTexture {
     const texture: WebGLTexture = this.glContext.createTexture()
 
@@ -199,28 +230,30 @@ export default class Fake3D {
     return texture
   }
 
-  public setup(): void {
-    this.winWidth = window.innerWidth
-    this.winHeight = window.innerHeight
-    this.ratio = window.devicePixelRatio
+  public setup({
+    _width = window.innerWidth,
+    _height = window.innerHeight
+  } = {}): void {
+    this.width = _width
+    this.height = _height
 
-    this.canvas.width = this.winWidth * this.ratio
-    this.canvas.height = this.winHeight * this.ratio
-    this.canvas.style.width = `${this.winWidth}px`
-    this.canvas.style.height = `${this.winHeight}px`
+    this.canvas.width = this.width * this.ratio
+    this.canvas.height = this.height * this.ratio
+    this.canvas.style.width = `${this.width}px`
+    this.canvas.style.height = `${this.height}px`
 
-    if (this.winHeight / this.winWidth < this.imageAspect) {
+    if (this.height / this.width < this.imageAspect) {
       this.uResolution.set(
-        this.winWidth,
-        this.winHeight,
+        this.width,
+        this.height,
         1,
-        this.winHeight / this.winWidth / this.imageAspect
+        this.height / this.width / this.imageAspect
       )
     } else {
       this.uResolution.set(
-        this.winWidth,
-        this.winHeight,
-        (this.winWidth / this.winHeight) * this.imageAspect,
+        this.width,
+        this.height,
+        (this.width / this.height) * this.imageAspect,
         1
       )
     }
@@ -229,8 +262,35 @@ export default class Fake3D {
     this.glContext.viewport(
       0,
       0,
-      this.winWidth * this.ratio,
-      this.winHeight * this.ratio
+      this.width * this.ratio,
+      this.height * this.ratio
     )
+  }
+}
+
+class Uniform {
+  name: string
+  suffix: string
+  program: WebGLProgram
+  gl: WebGLRenderingContext
+  location: WebGLUniformLocation
+
+  constructor(
+    name: string,
+    suffix: string,
+    program: WebGLProgram,
+    gl: WebGLRenderingContext
+  ) {
+    this.name = name
+    this.suffix = suffix
+    this.program = program
+    this.gl = gl
+    this.location = gl.getUniformLocation(program, name)
+  }
+
+  set(...values: any[]): void {
+    const method: string = `uniform${this.suffix}`
+    const args: any[] = [this.location].concat(values)
+    this.gl[method].apply(this.gl, args)
   }
 }
