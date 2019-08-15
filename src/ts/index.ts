@@ -32,7 +32,9 @@ const rainbow: [number, number, number][] = [
 let fake3D: Fake3D
 
 async function init(): Promise<void> {
-  const originalImage: HTMLImageElement = await loadImg('/img/girl.jpg')
+  const originalImage: HTMLImageElement = await loadImg(
+    '/img/gravure_10_mika.jpg'
+  )
   // const net: bodyPix.BodyPix = await bodyPix.load()
   // const segmentation = await net.estimatePersonSegmentation(image)
   // const partSegmentation = await net.estimatePartSegmentation(image)
@@ -104,7 +106,7 @@ async function createDepthMap(
     rainbow
   )
   const opacity: number = 1
-  const maskBlurAmount: number = 40
+  const maskBlurAmount: number = 10
   const flipHorizontal: boolean = false
   const poxelCellWidth: number = 2
 
@@ -147,8 +149,8 @@ async function createDepthMap(
 }
 
 function render() {
-  fake3D.dx = Math.cos(new Date().getTime() / 800)
-  fake3D.dy = Math.sin(new Date().getTime() / 600)
+  fake3D.dx = Math.cos(new Date().getTime() / 800) * 0.3
+  fake3D.dy = Math.sin(new Date().getTime() / 600) * 0.3
 
   fake3D.render()
   requestAnimationFrame(render)
