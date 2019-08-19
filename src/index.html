@@ -6,8 +6,20 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>Document</title>
     <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      *::before,
+      *::after {
+        pointer-events: none;
+      }
+
       html,
-      body {
+      body,
+      #app {
         overflow: hidden;
         height: 100%;
         margin: 0;
@@ -31,6 +43,7 @@
         overflow: auto;
         position: relative;
         height: 100%;
+        text-align: center;
       }
 
       .wrapper.-loading::before {
@@ -60,13 +73,10 @@
       video {
         display: block;
         margin: auto;
+        background-color: #ccc;
       }
 
-      .media {
-        text-align: center;
-      }
-
-      #shoot {
+      button {
         width: 200px;
         padding: 10px;
         margin: 20px auto 0;
@@ -75,15 +85,22 @@
         background-image: linear-gradient(#ccc, #bbb);
         cursor: pointer;
       }
+
+      .Loading .media {
+        display: none;
+      }
+
+      .screen {
+        display: none;
+      }
+
+      .Done .screen {
+        display: block;
+      }
     </style>
   </head>
   <body>
-    <div class="wrapper">
-      <div class="media">
-        <video src="" id="video"></video>
-        <button type="button" id="shoot">OK</button>
-      </div>
-    </div>
-    <script src="./ts/index.ts"></script>
+    <div id="app"></div>
+    <script src="./ts/index.tsx"></script>
   </body>
 </html>
