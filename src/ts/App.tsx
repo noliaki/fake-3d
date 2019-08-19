@@ -5,9 +5,9 @@ import React, {
   useEffect,
   useState
 } from 'react'
+import _debounce from 'lodash/debounce'
 import createDepthMap from './createDepth'
 import Fake3D from './Fake3D'
-import _debounce from 'lodash/debounce'
 
 export enum Status {
   Streaming,
@@ -17,11 +17,13 @@ export enum Status {
 
 export default function(): ReactElement {
   const amount: number = 2.5
-  const fake3D: React.MutableRefObject<Fake3D> = useRef()
-  const screenCanvas: React.MutableRefObject<HTMLCanvasElement> = useRef()
+  const fake3D: React.MutableRefObject<Fake3D | undefined> = useRef(null as any)
+  const screenCanvas: React.MutableRefObject<HTMLCanvasElement> = useRef(
+    null as any
+  )
   const [status, setStatus] = useState(Status.Streaming)
 
-  const videoEl: React.MutableRefObject<HTMLVideoElement> = useRef()
+  const videoEl: React.MutableRefObject<HTMLVideoElement> = useRef(null as any)
   const onClick: (
     event: React.MouseEvent<HTMLButtonElement, MouseEvent>
   ) => void = useCallback(
@@ -51,6 +53,8 @@ export default function(): ReactElement {
       const x: number = -(event.clientX * 2 - boxWidth) / boxWidth
       const y: number = -(event.clientY * 2 - boxHeight) / boxHeight
 
+      if (!fake3D.current) return
+
       fake3D.current.dx = x * amount
       fake3D.current.dy = y * amount
     },
@@ -68,6 +72,7 @@ export default function(): ReactElement {
       videoEl.current.srcObject = stream
       await videoEl.current.play()
     })()
+
     window.addEventListener(
       'resize',
       _debounce(() => {
@@ -84,6 +89,8 @@ export default function(): ReactElement {
   }
 
   function render() {
+    if (!(fake3D && fake3D.current)) return
+
     fake3D.current.render()
     requestAnimationFrame(render)
   }
@@ -133,9 +140,11 @@ async function getStream(
 async function createFake3D(
   videoEl: HTMLVideoElement,
   screenEl: HTMLCanvasElement
-): Promise<Fake3D> {
+): Promise<Fake3D | undefined> {
   const canvas: HTMLCanvasElement = document.createElement('canvas')
-  const context: CanvasRenderingContext2D = canvas.getContext('2d')
+  const context: CanvasRenderingContext2D | null = canvas.getContext('2d')
+
+  if (!context) return
 
   canvas.width = videoEl.videoWidth
   canvas.height = videoEl.videoHeight
