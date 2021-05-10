@@ -23,7 +23,7 @@
     "@tensorflow-models/body-pix": "^1.1.2",
     "@tensorflow/tfjs-converter": "^1.2.7",
     "@tensorflow/tfjs-core": "^1.2.8",
-    "lodash": "^4.17.15",
+    "lodash": "^4.17.21",
     "react": "^16.9.0",
     "react-dom": "^16.9.0"
   }
